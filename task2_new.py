@@ -6,8 +6,6 @@ L = 6
 U = np.array([0.0, 15.0, 15.0, 15.0, 15.0, 15.0]) 
 V = -1
 
-
-
 def build_H_matrix(eps1):
     eps = np.zeros(L)
     eps[0] = eps1
@@ -26,11 +24,11 @@ def build_H_matrix(eps1):
     return H
 
 H0 = build_H_matrix(-15)
-H1 = build_H_matrix(7.5)
+eps1 = 5  # value of eps1 for t > 0
 
 
 
-t = np.linspace(0, 20, 1000)
+t = np.linspace(0, 20, 10000)
 
 
 
@@ -38,16 +36,13 @@ t = np.linspace(0, 20, 1000)
 E0, psi_0_eigenvectors = np.linalg.eigh(
     H0
 )
-E1, lambda_basis = np.linalg.eigh(
-    H1
-)
 
 psi_0 = psi_0_eigenvectors[
     :, 0
-] 
+]
 
 
-def solution(t, n):  # calculates equation 16
+def solution(t, n, E1, lambda_basis):  # calculates equation 16, E1 and lambda_basis are the eigenvalues/vectors of H'
 
     def inner_sum(lam):  # calculates the inner sum of equation 16
 
@@ -68,35 +63,15 @@ def solution(t, n):  # calculates equation 16
     return psi_net
 
 
-def plot3d(ax, dataset, title):  # plots the site densities along each other
+def densities(eps1):  # rho_up and rho_double for a quench eps1: -15 -> eps1
+    E1, lambda_basis = np.linalg.eigh(build_H_matrix(eps1))  # H'|lambda>=E_lambda|lambda>
 
-    for lane, data in enumerate(dataset):
-        x = t
-        y = np.full_like(x, lane + 1)
-        z = data
+    wave_function_dataset = [abs(solution(t, i, E1, lambda_basis)) ** 2 for i in range(L**2)]
 
-        ax.plot(x, y, z, linewidth=3, label=f"site {lane + 1}")
+    rho_up = [sum(wave_function_dataset[L*m+k] for k in range(L)) for m in range(L)]
+    rho_double = [wave_function_dataset[L*n+n] for n in range(L)]
 
-    ax.set_xlabel("time")
-    ax.set_ylabel("site")
-    ax.set_zlabel("Probability density")
-    ax.set_title(title)
-
-    ax.view_init(elev=25, azim=-65)
-
-    ax.legend()
-
-
-def plot2d(ax, dataset, title):  # plots the site densities against time in the same axes
-
-    for lane, data in enumerate(dataset):
-        ax.plot(t, data, linewidth=2, label=f"site {lane + 1}")
-
-    ax.set_xlabel("time")
-    ax.set_ylabel("Probability density")
-    ax.set_title(title)
-
-    ax.legend()
+    return rho_up, rho_double
 
 
 def plot_animated(dataset):  # animates the probability density in time across space
@@ -117,7 +92,7 @@ def plot_animated(dataset):  # animates the probability density in time across s
     ax.set_ylabel("Probability density")
 
     ax.set_xlim(-0.5, n_lanes - 0.5)
-    ax.set_ylim(np.min(dataset), np.max(dataset))
+    ax.set_ylim(np.min(dataset), 0.5)
 
     ax.set_xticks(lanes)
 
@@ -139,19 +114,7 @@ def plot_animated(dataset):  # animates the probability density in time across s
     return ani
 
 
-wave_function_dataset = [abs(solution(t, i)) ** 2 for i in range(L**2)]
-rho_up = [sum(wave_function_dataset[L*m+k] for k in range(L)) for m in range(L)]
-rho_double = [wave_function_dataset[L*n + n] for n in range(L)]
-
-fig = plt.figure(figsize=(16, 6))
-plot3d(fig.add_subplot(121, projection="3d"), rho_up, r"$\rho_{n\uparrow}$")
-plot3d(fig.add_subplot(122, projection="3d"), rho_double, r"$\rho^{(2)}_n$")
-plt.tight_layout()
-
-fig, (ax_up, ax_double) = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-plot2d(ax_up, rho_up, r"$\rho_{n\uparrow}$")
-plot2d(ax_double, rho_double, r"$\rho^{(2)}_n$")
-plt.tight_layout()
+rho_up, rho_double = densities(eps1)
 
 fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharex=True, sharey=True)
 for site, ax in enumerate(axes.flat):  # one panel per site with rho_up and rho_double on top of each other
@@ -166,15 +129,7 @@ for ax in axes[:, 0]:
 plt.tight_layout()
 
 
-def densities(eps1):  # rho_up and rho_double for a quench eps1: -15 -> eps1, same as equation 16 but vectorized
-    E, lam = np.linalg.eigh(build_H_matrix(eps1))
-    with np.errstate(all="ignore"):  # silences spurious matmul warnings from numpy's Accelerate backend on macOS
-        psi_t = lam @ (np.exp(-1j * np.outer(E, t)) * (lam.T @ psi_0)[:, None])
-    prob = (np.abs(psi_t) ** 2).reshape(L, L, len(t))  # prob[n_up, n_down, t]
-    return prob.sum(axis=1), np.array([prob[n, n] for n in range(L)])
-
-
-eps1_values = np.linspace(6, 9, 101)
+eps1_values = np.linspace(5, 25, 50)
 frames = [densities(eps1) for eps1 in eps1_values]
 
 fig_anim, axes = plt.subplots(3, 2, figsize=(12, 10), sharex=True, sharey=True)
@@ -204,4 +159,4 @@ def update_eps1(frame):
 ani = FuncAnimation(fig_anim, update_eps1, frames=len(eps1_values), interval=150)  # keep a reference or it stops
 
 plt.show()
-#plot_animated(wave_function_dataset).save("wavefunctions.mp4", writer="ffmpeg", fps=30)
+#plot_animated(rho_up).save("wavefunctions.mp4", writer="ffmpeg", fps=30)
