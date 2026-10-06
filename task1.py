@@ -7,8 +7,6 @@ At t = 0 the perturbation eps1 is added to site 1, H' = H0 + eps1|1><1| (Eq. 9).
 import numpy as np
 import matplotlib.pyplot as plt
 
-from themes import apply_theme
-
 
 # ---------- parameters ----------
 
@@ -17,8 +15,6 @@ V = -1.0
 eps1_values = [2.0, -2.0]  # perturbations added to site 1 for t > 0, one panel each
 
 t = np.linspace(0, 20, 1000)
-
-THEME = "matplotlib"
 
 
 # ---------- physics ----------
@@ -50,8 +46,6 @@ psi_0 = psi_0_eigenvectors[:, 0]  # ground state of H0
 
 
 # ---------- plot: one panel per eps1 ----------
-
-apply_theme(THEME)
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
 for ax, eps1 in zip(axes, eps1_values):
